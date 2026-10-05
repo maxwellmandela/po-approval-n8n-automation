@@ -3,11 +3,17 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const codeNode = await readFile(new URL('./approver-reply-classifier.js', import.meta.url), 'utf8');
+const replyWorkflow = JSON.parse(await readFile(new URL('./workflow.json', import.meta.url), 'utf8'));
+const workflowCodeNode = replyWorkflow.nodes.find((node) => node.name === 'Classify reply').parameters.jsCode;
 
-function classifyReply(reply) {
-    const runCodeNode = new Function('$input', codeNode);
+function runClassifier(code, reply) {
+    const runCodeNode = new Function('$input', code);
 
     return runCodeNode({ all: () => [{ json: reply }] })[0].json;
+}
+
+function classifyReply(reply) {
+    return runClassifier(codeNode, reply);
 }
 
 const baseReply = {
@@ -76,4 +82,10 @@ test('extracts sender and plain text from Gmail API payloads', () => {
 
     assert.equal(result.action, 'clarify');
     assert.equal(result.sender_email, 'finance@example.com');
+});
+
+test('the imported workflow contains the tested classifier', () => {
+    const reply = { ...baseReply, textPlain: 'Please clarify why this model is required.' };
+
+    assert.deepEqual(runClassifier(workflowCodeNode, reply), classifyReply(reply));
 });

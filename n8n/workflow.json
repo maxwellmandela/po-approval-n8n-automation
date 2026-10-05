@@ -1,0 +1,138 @@
+{
+  "name": "Procurement - Gmail Replies to Laravel",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyMinute" }] },
+        "simple": false,
+        "filters": { "q": "in:inbox PR-" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "id": "8850c0b6-73ea-4ddd-92c0-270115858f18",
+      "name": "Watch procurement replies"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n    const email = item.json;\n    const headers = Array.isArray(email.payload?.headers) ? email.payload.headers : Array.isArray(email.headers) ? email.headers : [];\n    const getHeader = (name) => headers.find((header) => String(header.name ?? '').toLowerCase() === name)?.value ?? '';\n    const extractPlainText = (part) => {\n        if (part.mimeType === 'text/plain' && part.body?.data) {\n            const data = part.body.data.replace(/-/g, '+').replace(/_/g, '/');\n            return Buffer.from(data, 'base64').toString('utf8');\n        }\n        return (part.parts ?? []).map(extractPlainText).filter(Boolean).join('\\n');\n    };\n    const subject = String(email.subject ?? email.Subject ?? getHeader('subject'));\n    const rawBody = String(email.textPlain ?? email.text ?? email.body ?? extractPlainText(email.payload ?? {}) ?? email.snippet ?? '');\n    const currentBody = rawBody.replace(/\\r/g, '').split(/\\n(?:On .{1,200}wrote:|From: .+|>.*)/i)[0].trim();\n    const fromValue = email.from ?? email.From ?? email.sender ?? getHeader('from');\n    const fromText = typeof fromValue === 'string' ? fromValue : String(fromValue.email ?? fromValue.address ?? '');\n    const senderEmail = fromText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? '';\n    const messageId = String(email.id ?? email.messageId ?? email.message_id ?? '');\n    const requestNumber = `${subject}\\n${currentBody}`.match(/\\bPR-\\d{4}-\\d{4,}\\b/i)?.[0]?.toUpperCase() ?? '';\n    const authenticationResults = String(email.authenticationResults ?? getHeader('authentication-results'));\n    const senderAuthenticated = /\\bdmarc=pass\\b/i.test(authenticationResults);\n    const cancellation = /\\b(?:cancel(?:lation)?|withdraw(?:al)?)\\b/i.test(currentBody);\n    const asksClarification = /\\b(?:clarif(?:y|ication)|please explain|could you explain|need more (?:information|details)|please (?:send|provide) (?:more|additional) (?:information|details))\\b/i.test(currentBody);\n    const rejects = /\\b(?:reject(?:ed)?|decline(?:d)?|do not approve|don't approve|cannot approve|can't approve|not approved)\\b/i.test(currentBody);\n    const approves = /^\\s*(?:(?:yes|okay|ok)[,.!\\s]+)?(?:i\\s+)?(?:approve(?:d)?|looks good(?: to me)?|go ahead|proceed)\\b/i.test(currentBody);\n    let action = 'needs_review';\n    let classificationReason = 'No single explicit decision was recognized.';\n    if (cancellation) {\n        classificationReason = 'Cancellation is not an approver action supported by the workflow.';\n    } else if (/\\bclarification requested\\b/i.test(subject)) {\n        action = 'clarification_response';\n        classificationReason = 'Reply belongs to a clarification email thread.';\n    } else {\n        const detectedActions = [asksClarification, rejects, approves].filter(Boolean).length;\n        if (detectedActions === 1 && asksClarification) { action = 'clarify'; classificationReason = 'Clarification request recognized.'; }\n        else if (detectedActions === 1 && rejects) { action = 'reject'; classificationReason = 'Rejection recognized.'; }\n        else if (detectedActions === 1 && approves) { action = 'approve'; classificationReason = 'Approval recognized.'; }\n        else if (detectedActions > 1) { classificationReason = 'Conflicting decisions were found in the reply.'; }\n    }\n    if (!requestNumber || !senderEmail || !messageId) { action = 'needs_review'; classificationReason = 'Request number, sender email, or provider message ID is missing.'; }\n    else if (!senderAuthenticated) { action = 'needs_review'; classificationReason = 'The message does not have a passing DMARC result.'; }\n    return { json: { ...email, message_id: messageId, request_number: requestNumber, sender_email: senderEmail, sender_authenticated: senderAuthenticated, action, comment: currentBody, classification_reason: classificationReason } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "id": "6d3f9f1d-cfb3-42af-8291-1129e612820f",
+      "name": "Classify reply"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "id": "b4588974-ddde-4be3-8d46-6a34afbe78ae", "leftValue": "={{$json.action}}", "rightValue": "needs_review", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [760, 300],
+      "id": "1dc75cc6-d9b3-41aa-bd73-9a458940164a",
+      "name": "Needs manual review?"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "REPLACE_WITH_MANUAL_REVIEW_ADDRESS",
+        "subject": "=Manual review needed: {{$json.request_number || 'unmatched email'}}",
+        "message": "=An approver email was not applied automatically.\\nReason: {{$json.classification_reason}}\\nFrom: {{$json.sender_email || 'unknown'}}\\nSubject: {{$json.subject || 'unknown'}}\\n\\nReview the message in Gmail and use the procurement portal for any required action.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1020, 160],
+      "id": "6a6be275-e90b-4050-98f4-a95bf238553d",
+      "name": "Notify manual reviewer"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "id": "d3be4331-ae9a-40db-9ac8-b641e8dfb18c", "leftValue": "={{$json.action}}", "rightValue": "clarification_response", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1020, 440],
+      "id": "4b53ea3b-40eb-4d5f-a9e8-216d63bdc89b",
+      "name": "Requester clarification reply?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_LARAVEL_HOST/api/v1/requester/email-clarification-response",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { message_id: $json.message_id, request_number: $json.request_number, sender_email: $json.sender_email, sender_authenticated: $json.sender_authenticated, body: $json.comment } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 360],
+      "id": "ed6799c0-a0e8-4561-8c18-6cb08f5f79fd",
+      "name": "Store requester clarification"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_LARAVEL_HOST/api/v1/approver/email-decision",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { message_id: $json.message_id, request_number: $json.request_number, sender_email: $json.sender_email, sender_authenticated: $json.sender_authenticated, action: $json.action, comment: $json.comment } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 520],
+      "id": "65970616-16c5-469a-83bd-69d9bc2012ac",
+      "name": "Submit approver decision"
+    }
+  ],
+  "connections": {
+    "Watch procurement replies": {
+      "main": [[{ "node": "Classify reply", "type": "main", "index": 0 }]]
+    },
+    "Classify reply": {
+      "main": [[{ "node": "Needs manual review?", "type": "main", "index": 0 }]]
+    },
+    "Needs manual review?": {
+      "main": [
+        [{ "node": "Notify manual reviewer", "type": "main", "index": 0 }],
+        [{ "node": "Requester clarification reply?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Requester clarification reply?": {
+      "main": [
+        [{ "node": "Store requester clarification", "type": "main", "index": 0 }],
+        [{ "node": "Submit approver decision", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "56941825-388b-49a9-a63d-435188febf36",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

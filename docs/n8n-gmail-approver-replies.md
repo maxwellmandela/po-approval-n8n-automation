@@ -19,19 +19,22 @@ N8N_WEBHOOK_SECRET=<long-random-shared-secret>
 
 ## Notification workflow
 
-1. Add an n8n Webhook trigger for Laravel's submitted, clarification-requested, resubmitted, approved, and rejected events.
-2. Verify Laravel's `X-N8N-Signature` using the shared secret before sending email.
-3. Send to the event's `approver.email` or `requester.email` as appropriate.
-4. Include the request number and thread type in the subject: `[PR-2026-0042] Approval needed` for approvers, `[PR-2026-0042] Clarification requested` for requesters.
-5. Set the email's `Reply-To` to the monitored mailbox. Keep the request number and thread type in the subject when the recipient replies.
+1. Import [`n8n/procurement-notifications.workflow.json`](../n8n/procurement-notifications.workflow.json).
+2. Create an n8n Header Auth credential with header name `X-N8N-Webhook-Secret` and the same value as Laravel's `N8N_WEBHOOK_SECRET`; assign it to the Webhook trigger. Laravel also sends `X-N8N-Signature`, but this export authenticates with the shared-secret header.
+3. Assign a Gmail OAuth2 credential to the send node and replace the `REPLACE_WITH_MONITORED_GMAIL_ADDRESS` reply-to placeholder.
+4. Set Laravel's `N8N_BASE_URL` to the active production webhook URL shown in the imported n8n Webhook node.
+5. Activate the workflow only after the webhook credential, Gmail credential, and reply-to address are configured.
+6. Send to the event's `approver.email` or `requester.email` as appropriate. The request number and thread type appear in the subject so replies can be correlated.
 
 ## Reply workflow
 
-1. Add a Gmail Trigger for new messages in the monitored inbox. Configure Gmail OAuth2 credentials in n8n and retain the full Gmail payload, including the `Authentication-Results` header and message ID. The classifier requires `dmarc=pass` before allowing an action.
-2. Add a Code node and paste the contents of [`n8n/approver-reply-classifier.js`](../n8n/approver-reply-classifier.js).
-3. Route `action = needs_review` to a manual follow-up path. Do not call Laravel for those messages. Cancellation is not currently supported.
-4. Route `approve`, `reject`, and `clarify` to the approver HTTP Request node. Route `clarification_response` to the requester HTTP Request node.
-5. POST approver JSON to `https://<laravel-host>/api/v1/approver/email-decision` with an n8n Header Auth credential named `X-N8N-Webhook-Secret`.
+1. Import [`n8n/workflow.json`](../n8n/workflow.json).
+2. Assign Gmail OAuth2 credentials to the Gmail Trigger and manual-review email node. Keep the full Gmail payload, including the `Authentication-Results` header and message ID; the classifier requires `dmarc=pass` before it allows a callback.
+3. Create/assign an n8n Header Auth credential with header name `X-N8N-Webhook-Secret` and value matching Laravel's `N8N_WEBHOOK_SECRET` to both HTTP Request nodes.
+4. Replace `REPLACE_WITH_LARAVEL_HOST` on both nodes with the stable HTTPS Laravel host and replace `REPLACE_WITH_MANUAL_REVIEW_ADDRESS` with an operational mailbox.
+5. Route `action = needs_review` to manual follow-up. Do not call Laravel for those messages. Cancellation is not currently supported.
+6. Route `approve`, `reject`, and `clarify` to the approver HTTP Request node. Route `clarification_response` to the requester HTTP Request node.
+7. Activate only after credentials, placeholders, callback URL, and Laravel migration are configured.
 
 Map the HTTP Request JSON body from the Code node output:
 

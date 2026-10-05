@@ -1,0 +1,60 @@
+{
+  "name": "Procurement - Laravel Events to Gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procurement-events",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "id": "a80e6b90-16e0-4b73-b1ea-8025202cd3bb",
+      "name": "Laravel Procurement Event",
+      "webhookId": "procurement-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body ?? $json;\nconst requestNumber = payload.request_number ?? 'Unknown request';\nconst requester = payload.requester ?? {};\nconst approver = payload.approver ?? {};\nconst amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(payload.amount ?? 0));\nconst detail = [\n  `Request: ${requestNumber}`,\n  `Item: ${payload.item_description ?? 'Not provided'} (quantity: ${payload.quantity ?? 'n/a'})`,\n  `Department: ${payload.department ?? 'Not provided'}`,\n  `Vendor: ${payload.vendor_name ?? 'Not specified'}`,\n  `Amount: ${amount}`,\n  `Required by: ${payload.required_by ?? 'Not specified'}`,\n  `Justification: ${payload.justification ?? 'Not provided'}`\n].join('\\n');\nlet to;\nlet subject;\nlet message;\nswitch (payload.event) {\n  case 'procurement.request.submitted':\n    to = approver.email;\n    subject = `[${requestNumber}] Approval needed`;\n    message = `A procurement request needs your review.\\n\\n${detail}\\n\\nReply to this email with a clear decision: approve, reject with a reason, or ask for clarification. Keep the request number in the subject.`;\n    break;\n  case 'procurement.request.clarification_requested':\n    to = requester.email;\n    subject = `[${requestNumber}] Clarification requested`;\n    message = `The approver needs more information about your procurement request.\\n\\nQuestion: ${payload.clarification?.question ?? 'Please check the portal for details.'}\\n\\n${detail}\\n\\nReply to this email with your clarification. Keep the request number and subject unchanged.`;\n    break;\n  case 'procurement.request.resubmitted':\n    to = approver.email;\n    subject = `[${requestNumber}] Requester clarification received`;\n    message = `The requester has responded to the clarification request. Please review the updated request in the procurement system.\\n\\n${detail}`;\n    break;\n  case 'procurement.request.approved':\n  case 'procurement.request.rejected':\n    to = requester.email;\n    subject = `[${requestNumber}] Request ${payload.status}`;\n    message = `Your procurement request has been ${payload.status}.\\n\\n${detail}\\n\\n${payload.approval?.comments ?? payload.approval?.reason ?? ''}`;\n    break;\n  default:\n    throw new Error(`Unsupported procurement event: ${payload.event}`);\n}\nif (!to) throw new Error(`No recipient configured for event ${payload.event}`);\nreturn [{ json: { to, subject, message, replyTo: 'REPLACE_WITH_MONITORED_GMAIL_ADDRESS' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "id": "34f1630c-2bfe-413f-953c-3ec0da2b9d82",
+      "name": "Build notification"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.message}}",
+        "options": {
+          "replyTo": "={{$json.replyTo}}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [760, 300],
+      "id": "ca5bbcd7-8e7b-457b-90e7-978bccb7ea43",
+      "name": "Send procurement email"
+    }
+  ],
+  "connections": {
+    "Laravel Procurement Event": {
+      "main": [[{ "node": "Build notification", "type": "main", "index": 0 }]]
+    },
+    "Build notification": {
+      "main": [[{ "node": "Send procurement email", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "c86f4762-4f5b-4fa1-9bbf-6a69c22cc6c7",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

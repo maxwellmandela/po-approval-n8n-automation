@@ -15,16 +15,21 @@ class IntegrationEventService
             'event' => $event,
             'request_id' => $request->id,
             'request_number' => $request->request_number,
+            'item_description' => $request->item_description,
+            'quantity' => $request->quantity,
             'amount' => $request->amount,
             'department' => $request->department,
             'status' => $request->status,
+            'vendor_name' => $request->vendor_name,
+            'required_by' => $request->required_by?->toDateString(),
+            'justification' => $request->justification,
             'requester' => [
                 'name' => $request->requester?->name,
                 'email' => $request->requester?->email,
             ],
             'approver' => [
-                'name' => $request->current_approver?->name,
-                'email' => $request->current_approver?->email,
+                'name' => $request->currentApprover?->name,
+                'email' => $request->currentApprover?->email,
             ],
             'actor' => $actor ? [
                 'name' => $actor->name,
@@ -44,6 +49,7 @@ class IntegrationEventService
             Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'X-N8N-Signature' => $signature,
+                'X-N8N-Webhook-Secret' => $secret,
                 'X-Procurement-Event' => $event,
             ])->post($webhookUrl, $payload);
         }
