@@ -1,9 +1,27 @@
-@import 'tailwindcss';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+	body {
+		@apply bg-slate-50 text-slate-900 antialiased;
+	}
+
+	a {
+		@apply transition-colors duration-200;
+	}
+}
+
+@layer components {
+	.glass-card {
+		@apply border border-slate-200 bg-white/80 backdrop-blur-sm shadow-sm;
+	}
+
+	.metric-card {
+		@apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm;
+	}
 }

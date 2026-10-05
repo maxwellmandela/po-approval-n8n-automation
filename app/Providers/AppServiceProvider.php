@@ -19,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if (! class_exists('AuthorizationException', false)) {
+            class_alias(\Illuminate\Auth\Access\AuthorizationException::class, 'AuthorizationException');
+        }
     }
 }
