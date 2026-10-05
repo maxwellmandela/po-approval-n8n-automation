@@ -13,6 +13,8 @@ Laravel (source of truth)
 
 Laravel remains the system of record for approval state, budgets, purchase orders, clarifications, and audit logs. n8n is responsible for delivering notifications and integrations, but it must not mutate procurement decisions directly.
 
+Approvers can make decisions by replying to email. n8n classifies the reply and sends the proposed action to Laravel; Laravel verifies the sender and applies the workflow transition.
+
 ## Available events
 
 - procurement.request.submitted
@@ -42,34 +44,41 @@ Laravel remains the system of record for approval state, budgets, purchase order
 }
 ```
 
-## Endpoint
+## Laravel to n8n events
+
+- Laravel posts lifecycle events to the n8n production webhook configured in `N8N_BASE_URL`.
+- Events are signed using `N8N_WEBHOOK_SECRET` in the `X-N8N-Signature` header.
+- The n8n workflow uses these events to send notifications and other downstream communications.
+
+## n8n to Laravel email decisions
 
 - Method: `POST`
-- URL: `/api/v1/webhooks/procurement`
-- Authentication: configurable secret in `N8N_WEBHOOK_SECRET` and `X-N8N-Signature` header
-- Purpose: receive events from Laravel for downstream automation
+- URL: `/api/v1/approver/email-decision`
+- Authentication: `X-N8N-Webhook-Secret` must match Laravel's `N8N_WEBHOOK_SECRET`.
+- Idempotency: `message_id` is the Gmail message ID; duplicate delivery is acknowledged without applying the action twice.
+- Supported actions: `approve`, `reject`, `clarify`.
+- Required identity: `sender_email` must match the request's currently assigned approver.
 
-### Example request
+Example JSON body:
 
-```bash
-curl -X POST "https://your-laravel-app.test/api/v1/webhooks/procurement" \
-  -H "Content-Type: application/json" \
-  -H "X-N8N-Signature: <sha256-hmac>" \
-  -d '{
-    "event": "procurement.request.approved",
-    "request_id": 42,
-    "request_number": "PR-2026-0042",
-    "amount": 85000,
-    "status": "approved"
-  }'
+```json
+{
+  "message_id": "gmail-message-id",
+  "request_number": "PR-2026-0042",
+  "sender_email": "approver@example.com",
+  "action": "clarify",
+  "comment": "Please explain why this model is required."
+}
 ```
+
+Use HTTPS and store the shared secret in an n8n Header Auth credential, not in workflow text. Configure the Laravel URL and secret as n8n credentials/variables.
 
 ## Security expectations
 
-- Keep the Laravel app behind normal authentication and TLS.
-- Store the shared secret in the environment as `N8N_WEBHOOK_SECRET`.
-- Validate the HMAC signature before processing inbound automation messages.
-- Keep n8n as an automation consumer, not as the business authority.
+- Keep the Laravel app behind TLS.
+- Laravel requires the shared secret and verifies that the email sender is the assigned approver.
+- Laravel applies status transitions and writes audit records; n8n does not directly update procurement state.
+- The message ID is recorded for idempotent processing when Gmail retries delivery.
 
 ## n8n responsibilities
 
@@ -82,10 +91,12 @@ n8n may:
 
 n8n should not:
 
-- approve or reject a procurement request,
+- decide an ambiguous email or apply an approval itself,
 - create purchase orders,
 - mutate budget data,
 - act as the source of truth for workflow state.
+
+Replies with conflicting intent, missing request numbers, or cancellation language should be routed for manual follow-up. Cancellation is not currently an approver action.
 
 ## Failure and retry
 

@@ -241,7 +241,7 @@ class ProcurementWorkflowService
         $allowed = match ($target) {
             'submitted' => ['draft'],
             'under_review' => ['submitted', 'resubmitted'],
-            'clarification_required' => ['under_review', 'submitted'],
+            'clarification_required' => ['under_review', 'submitted', 'resubmitted'],
             'resubmitted' => ['clarification_required'],
             'approved' => ['submitted', 'under_review', 'resubmitted'],
             'rejected' => ['submitted', 'under_review', 'resubmitted'],
