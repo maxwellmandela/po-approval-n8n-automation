@@ -14,32 +14,24 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $requester = User::updateOrCreate(
-            ['email' => 'jane@example.com'],
-            [
-                'name' => 'Jane Requester',
-                'password' => Hash::make('password'),
-                'role' => 'requester',
-            ]
-        );
+        $seedUser = static function (string $previousEmail, string $email, string $name, string $role): User {
+            $user = User::where('email', $email)->first()
+                ?? User::where('email', $previousEmail)->first()
+                ?? new User;
 
-        $procurement = User::updateOrCreate(
-            ['email' => 'procurement@example.com'],
-            [
-                'name' => 'Procurement Manager',
+            $user->forceFill([
+                'name' => $name,
+                'email' => $email,
                 'password' => Hash::make('password'),
-                'role' => 'procurement',
-            ]
-        );
+                'role' => $role,
+            ])->save();
 
-        $finance = User::updateOrCreate(
-            ['email' => 'finance@example.com'],
-            [
-                'name' => 'Finance Approver',
-                'password' => Hash::make('password'),
-                'role' => 'approver',
-            ]
-        );
+            return $user;
+        };
+
+        $requester = $seedUser('jane@example.com', 'johh.doey.123@gmail.com', 'Jane Requester', 'requester');
+        $procurement = $seedUser('procurement@example.com', 'maxywhyner94@gmail.com', 'Procurement Manager', 'procurement');
+        $finance = $seedUser('finance@example.com', 'thealpa6@gmail.com', 'Finance Approver', 'approver');
 
         foreach (['Acme Office Supplies', 'Nairobi Industrial Solutions', 'East Africa Logistics'] as $vendorName) {
             Vendor::updateOrCreate(['name' => $vendorName], [

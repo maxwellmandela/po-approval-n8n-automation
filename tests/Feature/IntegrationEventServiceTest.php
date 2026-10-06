@@ -19,6 +19,7 @@ class IntegrationEventServiceTest extends TestCase
         config([
             'procurement.n8n_base_url' => 'https://n8n.example.test/webhook/procurement-events',
             'procurement.n8n_webhook_secret' => 'local-test-secret',
+            'procurement.reply_to' => 'procurement@example.test',
         ]);
 
         $requester = User::factory()->create(['role' => 'requester']);
@@ -43,6 +44,7 @@ class IntegrationEventServiceTest extends TestCase
             && $request->hasHeader('X-N8N-Signature')
             && $request->data()['request_number'] === 'PR-2026-0100'
             && $request->data()['item_description'] === 'Developer laptop'
+            && $request->data()['reply_to'] === 'procurement@example.test'
             && $request->data()['approver']['email'] === $approver->email
         );
     }

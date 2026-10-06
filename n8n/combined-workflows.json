@@ -1,0 +1,348 @@
+{
+  "name": "Procurement - Laravel Events to Gmail",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "in:inbox PR-"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1232,
+        -128
+      ],
+      "id": "bd2c0e98-73f4-44eb-be8d-1e4c4c497aed",
+      "name": "Watch procurement replies",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4LyJdr0WfSpUnULW",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n    const email = item.json;\n    const headers = Array.isArray(email.payload?.headers) ? email.payload.headers : Array.isArray(email.headers) ? email.headers : [];\n    const getHeader = (name) => headers.find((header) => String(header.name ?? '').toLowerCase() === name)?.value ?? '';\n    const extractPlainText = (part) => {\n        if (part.mimeType === 'text/plain' && part.body?.data) {\n            const data = part.body.data.replace(/-/g, '+').replace(/_/g, '/');\n            return Buffer.from(data, 'base64').toString('utf8');\n        }\n        return (part.parts ?? []).map(extractPlainText).filter(Boolean).join('\\n');\n    };\n    const subject = String(email.subject ?? email.Subject ?? getHeader('subject'));\n    const rawBody = String(email.textPlain ?? email.text ?? email.body ?? extractPlainText(email.payload ?? {}) ?? email.snippet ?? '');\n    const currentBody = rawBody.replace(/\\r/g, '').split(/\\n(?:On .{1,200}wrote:|From: .+|>.*)/i)[0].trim();\n    const fromValue = email.from ?? email.From ?? email.sender ?? getHeader('from');\n    const fromText = typeof fromValue === 'string' ? fromValue : String(fromValue.email ?? fromValue.address ?? '');\n    const senderEmail = fromText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? '';\n    const messageId = String(email.id ?? email.messageId ?? email.message_id ?? '');\n    const requestNumber = `${subject}\\n${currentBody}`.match(/\\bPR-\\d{4}-\\d{4,}\\b/i)?.[0]?.toUpperCase() ?? '';\n    const authenticationResults = String(email.authenticationResults ?? getHeader('authentication-results'));\n    const senderAuthenticated = /\\bdmarc=pass\\b/i.test(authenticationResults);\n    const cancellation = /\\b(?:cancel(?:lation)?|withdraw(?:al)?)\\b/i.test(currentBody);\n    const asksClarification = /\\b(?:clarif(?:y|ication)|please explain|could you explain|need more (?:information|details)|please (?:send|provide) (?:more|additional) (?:information|details))\\b/i.test(currentBody);\n    const rejects = /\\b(?:reject(?:ed)?|decline(?:d)?|do not approve|don't approve|cannot approve|can't approve|not approved)\\b/i.test(currentBody);\n    const approves = /^\\s*(?:(?:yes|okay|ok)[,.!\\s]+)?(?:i\\s+)?(?:approve(?:d)?|looks good(?: to me)?|go ahead|proceed)\\b/i.test(currentBody);\n    let action = 'needs_review';\n    let classificationReason = 'No single explicit decision was recognized.';\n    if (cancellation) {\n        classificationReason = 'Cancellation is not an approver action supported by the workflow.';\n    } else if (/\\bclarification requested\\b/i.test(subject)) {\n        action = 'clarification_response';\n        classificationReason = 'Reply belongs to a clarification email thread.';\n    } else {\n        const detectedActions = [asksClarification, rejects, approves].filter(Boolean).length;\n        if (detectedActions === 1 && asksClarification) { action = 'clarify'; classificationReason = 'Clarification request recognized.'; }\n        else if (detectedActions === 1 && rejects) { action = 'reject'; classificationReason = 'Rejection recognized.'; }\n        else if (detectedActions === 1 && approves) { action = 'approve'; classificationReason = 'Approval recognized.'; }\n        else if (detectedActions > 1) { classificationReason = 'Conflicting decisions were found in the reply.'; }\n    }\n    if (!requestNumber || !senderEmail || !messageId) { action = 'needs_review'; classificationReason = 'Request number, sender email, or provider message ID is missing.'; }\n    else if (!senderAuthenticated) { action = 'needs_review'; classificationReason = 'The message does not have a passing DMARC result.'; }\n    return { json: { ...email, message_id: messageId, request_number: requestNumber, sender_email: senderEmail, sender_authenticated: senderAuthenticated, action, comment: currentBody, classification_reason: classificationReason } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -128
+      ],
+      "id": "fa684b6b-c95c-4457-995d-b0cb1a61e640",
+      "name": "Classify reply"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b4588974-ddde-4be3-8d46-6a34afbe78ae",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "needs_review",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -704,
+        -128
+      ],
+      "id": "a64a6aeb-4d28-41e0-91da-27f191201cee",
+      "name": "Needs manual review?"
+    },
+    {
+      "parameters": {
+        "sendTo": "mxmandela@gmail.com",
+        "subject": "=Manual review needed: {{$json.request_number || 'unmatched email'}}",
+        "message": "=An approver email was not applied automatically.\\nReason: {{$json.classification_reason}}\\nFrom: {{$json.sender_email || 'unknown'}}\\nSubject: {{$json.subject || 'unknown'}}\\n\\nReview the message in Gmail and use the procurement portal for any required action.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -448,
+        -272
+      ],
+      "id": "51b2743a-c3ab-4231-84ec-be5bbba4b76d",
+      "name": "Notify manual reviewer",
+      "webhookId": "d4b87205-a65b-4309-9d1a-bbe149293cf0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4LyJdr0WfSpUnULW",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d3be4331-ae9a-40db-9ac8-b641e8dfb18c",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "clarification_response",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -448,
+        16
+      ],
+      "id": "4cba257a-7bee-4959-89a8-701c1af3cf95",
+      "name": "Requester clarification reply?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upgraded-zebra-xxj74grj7pc5qq-8000.app.github.dev/api/v1/requester/email-clarification-response",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { message_id: $json.message_id, request_number: $json.request_number, sender_email: $json.sender_email, sender_authenticated: $json.sender_authenticated, body: $json.comment } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -176,
+        -80
+      ],
+      "id": "40dbd2f8-51e1-4eee-9190-afb601391174",
+      "name": "Store requester clarification",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gXP1Z7ddV4YBT620",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upgraded-zebra-xxj74grj7pc5qq-8000.app.github.dev/api/v1/approver/email-decision",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { message_id: $json.message_id, request_number: $json.request_number, sender_email: $json.sender_email, sender_authenticated: $json.sender_authenticated, action: $json.action, comment: $json.comment } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -176,
+        160
+      ],
+      "id": "7fb14e94-ed49-443e-abb5-599cfe43ff3a",
+      "name": "Submit approver decision",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gXP1Z7ddV4YBT620",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procurement-events",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1232,
+        240
+      ],
+      "id": "37689e6b-80bf-4629-90d6-db0151afe45e",
+      "name": "Laravel Procurement Event",
+      "webhookId": "procurement-events",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gXP1Z7ddV4YBT620",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body ?? $json;\nconst requestNumber = payload.request_number ?? 'Unknown request';\nconst requester = payload.requester ?? {};\nconst approver = payload.approver ?? {};\nconst amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(payload.amount ?? 0));\nconst detail = [\n  `Request: ${requestNumber}`,\n  `Item: ${payload.item_description ?? 'Not provided'} (quantity: ${payload.quantity ?? 'n/a'})`,\n  `Department: ${payload.department ?? 'Not provided'}`,\n  `Vendor: ${payload.vendor_name ?? 'Not specified'}`,\n  `Amount: ${amount}`,\n  `Required by: ${payload.required_by ?? 'Not specified'}`,\n  `Justification: ${payload.justification ?? 'Not provided'}`\n].join('\\n');\nlet to;\nlet subject;\nlet message;\nswitch (payload.event) {\n  case 'procurement.request.submitted':\n    to = approver.email;\n    subject = `[${requestNumber}] Approval needed`;\n    message = `A procurement request needs your review.\\n\\n${detail}\\n\\nReply to this email with a clear decision: approve, reject with a reason, or ask for clarification. Keep the request number in the subject.`;\n    break;\n  case 'procurement.request.clarification_requested':\n    to = requester.email;\n    subject = `[${requestNumber}] Clarification requested`;\n    message = `The approver needs more information about your procurement request.\\n\\nQuestion: ${payload.clarification?.question ?? 'Please check the portal for details.'}\\n\\n${detail}\\n\\nReply to this email with your clarification. Keep the request number and subject unchanged.`;\n    break;\n  case 'procurement.request.resubmitted':\n    to = approver.email;\n    subject = `[${requestNumber}] Requester clarification received`;\n    message = `The requester has responded to the clarification request. Please review the updated request in the procurement system.\\n\\n${detail}`;\n    break;\n  case 'procurement.request.approved':\n  case 'procurement.request.rejected':\n    to = requester.email;\n    subject = `[${requestNumber}] Request ${payload.status}`;\n    message = `Your procurement request has been ${payload.status}.\\n\\n${detail}\\n\\n${payload.approval?.comments ?? payload.approval?.reason ?? ''}`;\n    break;\n  default:\n    throw new Error(`Unsupported procurement event: ${payload.event}`);\n}\nif (!to) throw new Error(`No recipient configured for event ${payload.event}`);\nif (!payload.reply_to) throw new Error(\"Missing reply_to in Laravel event payload\");\nreturn [{ json: { to, subject, message, replyTo: payload.reply_to } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        240
+      ],
+      "id": "5bc35003-8c1d-4485-b77b-7050308a6e01",
+      "name": "Build notification"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.message}}",
+        "options": {
+          "replyTo": "={{$json.replyTo}}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -688,
+        240
+      ],
+      "id": "8b8720f0-1120-4bec-8500-5b3d52bdcf79",
+      "name": "Send procurement email",
+      "webhookId": "a4b3a916-664c-49d6-908a-96d387491cfb",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4LyJdr0WfSpUnULW",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Watch procurement replies": {
+      "main": [
+        [
+          {
+            "node": "Classify reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify reply": {
+      "main": [
+        [
+          {
+            "node": "Needs manual review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs manual review?": {
+      "main": [
+        [
+          {
+            "node": "Notify manual reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Requester clarification reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requester clarification reply?": {
+      "main": [
+        [
+          {
+            "node": "Store requester clarification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Submit approver decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Laravel Procurement Event": {
+      "main": [
+        [
+          {
+            "node": "Build notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build notification": {
+      "main": [
+        [
+          {
+            "node": "Send procurement email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5ec18a9d-91b9-4862-a8fa-8f1733de5144",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "94ca3505fe4f80f74681f3cdf5c7d903569d979d25a589965b65abeb0ebe21a7"
+  },
+  "id": "lLPQCggo2953XVe5",
+  "tags": []
+}

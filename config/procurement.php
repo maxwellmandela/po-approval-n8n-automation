@@ -4,6 +4,7 @@ return [
     'approval_threshold' => env('PROCUREMENT_APPROVAL_THRESHOLD', 100000),
     'n8n_webhook_secret' => env('N8N_WEBHOOK_SECRET'),
     'n8n_base_url' => env('N8N_BASE_URL'),
+    'reply_to' => env('PROCUREMENT_REPLY_TO'),
     'request_statuses' => [
         'draft',
         'submitted',

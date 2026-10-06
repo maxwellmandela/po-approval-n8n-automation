@@ -7,7 +7,7 @@ These exports are templates, not live workflows. Import each file into n8n and c
 
 ## Before activation
 
-1. Configure Laravel with `N8N_BASE_URL` set to the production Webhook URL from the notification workflow, and a strong `N8N_WEBHOOK_SECRET`.
+1. Configure Laravel with `N8N_BASE_URL` set to the production Webhook URL from the notification workflow, a strong `N8N_WEBHOOK_SECRET`, and `PROCUREMENT_REPLY_TO` set to the monitored procurement mailbox. Laravel includes that address as `reply_to` in every event payload.
 2. Create an n8n Header Auth credential using header `X-N8N-Webhook-Secret` and the same shared secret. Assign it to the notification Webhook trigger and both Laravel HTTP Request nodes.
 3. Create a Google OAuth client and configure the Gmail OAuth2 credential in n8n:
 	- Enable the Gmail API in the Google Cloud project.

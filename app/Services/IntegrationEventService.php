@@ -20,6 +20,7 @@ class IntegrationEventService
             'amount' => $request->amount,
             'department' => $request->department,
             'status' => $request->status,
+            'reply_to' => config('procurement.reply_to'),
             'vendor_name' => $request->vendor_name,
             'required_by' => $request->required_by?->toDateString(),
             'justification' => $request->justification,

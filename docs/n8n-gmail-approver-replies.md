@@ -13,9 +13,10 @@ Configure these values on the Laravel host:
 ```env
 N8N_BASE_URL=https://<n8n-host>/webhook/procurement-events
 N8N_WEBHOOK_SECRET=<long-random-shared-secret>
+PROCUREMENT_REPLY_TO=procurement@example.com
 ```
 
-`N8N_BASE_URL` is the active n8n production webhook that receives Laravel lifecycle events. Store the same secret in n8n credentials; do not put real credentials in workflow JSON or source control.
+`N8N_BASE_URL` is the active n8n production webhook that receives Laravel lifecycle events. Laravel adds `PROCUREMENT_REPLY_TO` to each event as `reply_to`; n8n uses it for the email's Reply-To header. Store the same secret in n8n credentials; do not put real credentials in workflow JSON or source control.
 
 ## Notification workflow
 
@@ -25,6 +26,8 @@ N8N_WEBHOOK_SECRET=<long-random-shared-secret>
 4. Set Laravel's `N8N_BASE_URL` to the active production webhook URL shown in the imported n8n Webhook node.
 5. Activate the workflow only after the webhook credential, Gmail credential, and reply-to address are configured.
 6. Send to the event's `approver.email` or `requester.email` as appropriate. The request number and thread type appear in the subject so replies can be correlated.
+
+When manually testing the n8n webhook with curl, include a `reply_to` value in the JSON payload. Laravel supplies it automatically from `PROCUREMENT_REPLY_TO` during normal operation.
 
 ## Reply workflow
 
