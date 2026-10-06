@@ -101,7 +101,7 @@
             @endif
 
             @if(auth()->user()->id === $request->requester_id && in_array($request->status, ['clarification_required','resubmitted']))
-                <form action="{{ route('requests.clarification.respond', $request->clarifications->first()) }}" method="POST" enctype="multipart/form-data" class="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                <form action="{{ route('requests.clarification.respond', $request->clarifications->first()) }}" method="POST" enctype="multipart/form-data" data-loading-form class="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
                     @csrf
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Respond to Clarification</h3>
                     @php($clarification = $request->clarifications->last())
@@ -117,7 +117,10 @@
                         <label for="response_documents" class="block text-sm font-medium text-gray-700">Supporting Document(s)</label>
                         <input type="file" name="response_documents[]" id="response_documents" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="mt-1 block w-full text-sm text-gray-600">
                     </div>
-                    <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Submit Response</button>
+                    <button type="submit" class="inline-flex min-w-40 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-wait disabled:opacity-70">
+                        <span data-submit-label>Submit Response</span>
+                        <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Submitting…</span>
+                    </button>
                 </form>
             @endif
         </div>

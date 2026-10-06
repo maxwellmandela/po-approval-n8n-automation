@@ -159,7 +159,7 @@ class ProcurementWorkflowService
 
             return $approval;
         });
-    }
+    } 
 
     public function createPurchaseOrder(ProcurementRequest $request, User $actor): PurchaseOrder
     {

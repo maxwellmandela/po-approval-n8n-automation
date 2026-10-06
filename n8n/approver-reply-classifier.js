@@ -5,7 +5,15 @@ return $input.all().map((item) => {
         : Array.isArray(email.headers)
             ? email.headers
             : [];
-    const getHeader = (name) => headers.find((header) => String(header.name ?? '').toLowerCase() === name)?.value ?? '';
+    const headerMap = email.headers && !Array.isArray(email.headers) ? email.headers : {};
+    const getHeader = (name) => {
+        const value = headers.find((header) => String(header.name ?? '').toLowerCase() === name)?.value
+            ?? headerMap[name]
+            ?? headerMap[name.toUpperCase()]
+            ?? '';
+
+        return String(value).replace(new RegExp(`^${name}:\\s*`, 'i'), '');
+    };
     const extractPlainText = (part) => {
         if (part.mimeType === 'text/plain' && part.body?.data) {
             const data = part.body.data.replace(/-/g, '+').replace(/_/g, '/');
@@ -23,7 +31,13 @@ return $input.all().map((item) => {
     const fromValue = email.from ?? email.From ?? email.sender ?? getHeader('from');
     const fromText = typeof fromValue === 'string'
         ? fromValue
-        : String(fromValue.email ?? fromValue.address ?? '');
+        : String(
+            fromValue.value?.find((entry) => entry.address)?.address
+                ?? fromValue.email
+                ?? fromValue.address
+                ?? fromValue.text
+                ?? ''
+        );
     const senderEmail = fromText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? '';
     const messageId = String(email.id ?? email.messageId ?? email.message_id ?? '');
     const requestNumber = `${subject}\n${currentBody}`.match(/\bPR-\d{4}-\d{4,}\b/i)?.[0]?.toUpperCase() ?? '';

@@ -5,7 +5,7 @@
 
     <div class="py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <form action="{{ route('requests.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <form action="{{ route('requests.store') }}" method="POST" enctype="multipart/form-data" data-loading-form class="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 @csrf
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -60,8 +60,14 @@
                 </div>
 
                 <div class="flex items-center justify-end gap-3">
-                    <button type="submit" name="status" value="draft" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save Draft</button>
-                    <button type="submit" name="status" value="submitted" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Submit Request</button>
+                    <button type="submit" name="status" value="draft" class="inline-flex min-w-28 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70">
+                        <span data-submit-label>Save Draft</span>
+                        <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Saving…</span>
+                    </button>
+                    <button type="submit" name="status" value="submitted" class="inline-flex min-w-40 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-wait disabled:opacity-70">
+                        <span data-submit-label>Submit Request</span>
+                        <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Submitting…</span>
+                    </button>
                 </div>
             </form>
         </div>

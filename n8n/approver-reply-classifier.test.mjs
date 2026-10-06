@@ -84,6 +84,28 @@ test('extracts sender and plain text from Gmail API payloads', () => {
     assert.equal(result.sender_email, 'finance@example.com');
 });
 
+test('classifies replies from the Gmail Trigger parsed message shape', () => {
+    const result = classifyReply({
+        id: 'gmail-message-125',
+        messageId: '<reply-125@mail.gmail.com>',
+        subject: 'Re: [PR-2026-0022] Approval needed',
+        from: {
+            value: [{ address: 'finance@example.com', name: 'Finance Approver' }],
+            text: 'Finance Approver <finance@example.com>',
+        },
+        headers: {
+            'authentication-results': 'Authentication-Results: mx.google.com; dkim=pass; spf=pass; dmarc=pass header.from=example.com',
+            from: 'From: Finance Approver <finance@example.com>',
+        },
+        text: 'approve\n\nRegards,\nFinance Approver\n\nOn Tue, Oct 6, 2026 at 12:54 PM wrote:\n> A procurement request needs your review.',
+    });
+
+    assert.equal(result.action, 'approve');
+    assert.equal(result.sender_email, 'finance@example.com');
+    assert.equal(result.sender_authenticated, true);
+    assert.equal(result.comment, 'approve\n\nRegards,\nFinance Approver');
+});
+
 test('the imported workflow contains the tested classifier', () => {
     const reply = { ...baseReply, textPlain: 'Please clarify why this model is required.' };
 

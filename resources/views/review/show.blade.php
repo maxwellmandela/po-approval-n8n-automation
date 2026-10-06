@@ -53,19 +53,28 @@
                     <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
                         <h3 class="text-sm font-semibold uppercase text-gray-500">Actions</h3>
                         <div class="mt-4 space-y-3">
-                            <form method="POST" action="{{ route('review.approve', $request) }}">
+                            <form method="POST" action="{{ route('review.approve', $request) }}" data-loading-form>
                                 @csrf
-                                <button type="submit" class="w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">Approve</button>
+                                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70">
+                                    <span data-submit-label>Approve</span>
+                                    <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Approving…</span>
+                                </button>
                             </form>
-                            <form method="POST" action="{{ route('review.reject', $request) }}">
+                            <form method="POST" action="{{ route('review.reject', $request) }}" data-loading-form>
                                 @csrf
-                                <input type="text" name="reason" placeholder="Rejection reason" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm mb-2">
-                                <button type="submit" class="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">Reject</button>
+                                <input type="text" name="reason" placeholder="Rejection reason" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm mb-2">
+                                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-wait disabled:opacity-70">
+                                    <span data-submit-label>Reject</span>
+                                    <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Rejecting…</span>
+                                </button>
                             </form>
-                            <form method="POST" action="{{ route('review.clarify', $request) }}">
+                            <form method="POST" action="{{ route('review.clarify', $request) }}" data-loading-form>
                                 @csrf
-                                <input type="text" name="question" placeholder="Clarification question" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm mb-2">
-                                <button type="submit" class="w-full rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400">Request Clarification</button>
+                                <input type="text" name="question" placeholder="Clarification question" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm mb-2">
+                                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400 disabled:cursor-wait disabled:opacity-70">
+                                    <span data-submit-label>Request Clarification</span>
+                                    <span data-submit-loading class="hidden inline-flex items-center gap-2" aria-live="polite"><span class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>Sending…</span>
+                                </button>
                             </form>
                         </div>
                     </div>

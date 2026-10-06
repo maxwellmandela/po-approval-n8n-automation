@@ -60,7 +60,9 @@ class ProcurementRequestController extends Controller
             app(ProcurementWorkflowService::class)->submit($procurementRequest, auth()->user());
         }
 
-        return redirect()->route('requests.show', $procurementRequest)->with('success', 'Request saved.');
+        $message = $submitImmediately ? 'Request submitted for approval.' : 'Draft saved.';
+
+        return redirect()->route('requests.show', $procurementRequest)->with('success', $message);
     }
 
     public function show(ProcurementRequest $procurementRequest): View

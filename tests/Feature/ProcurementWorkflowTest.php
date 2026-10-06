@@ -55,7 +55,8 @@ class ProcurementWorkflowTest extends TestCase
         $requester = $this->makeRequester();
         $vendor = Vendor::create(['name' => 'Acme Office Supplies']);
 
-        $this->actingAs($requester)
+        $this->followingRedirects()
+            ->actingAs($requester)
             ->post(route('requests.store'), [
                 'department' => 'Operations',
                 'vendor_id' => $vendor->id,
@@ -66,7 +67,8 @@ class ProcurementWorkflowTest extends TestCase
                 'justification' => 'Staff expansion',
                 'status' => 'draft',
             ])
-            ->assertRedirect();
+            ->assertOk()
+            ->assertSee('Draft saved.');
 
         $this->assertDatabaseHas('procurement_requests', [
             'requester_id' => $requester->id,
@@ -86,7 +88,8 @@ class ProcurementWorkflowTest extends TestCase
             'committed_amount' => 210000,
         ]);
 
-        $this->actingAs($requester)
+        $this->followingRedirects()
+            ->actingAs($requester)
             ->post(route('requests.store'), [
                 'department' => 'IT',
                 'vendor_id' => $vendor->id,
@@ -97,7 +100,8 @@ class ProcurementWorkflowTest extends TestCase
                 'justification' => 'Laptop for a new developer.',
                 'status' => 'submitted',
             ])
-            ->assertRedirect();
+            ->assertOk()
+            ->assertSee('Request submitted for approval.');
 
         $this->assertDatabaseHas('procurement_requests', [
             'requester_id' => $requester->id,

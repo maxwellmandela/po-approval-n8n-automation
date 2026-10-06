@@ -18,6 +18,29 @@
         <div class="min-h-screen bg-gray-100">
             @include('layouts.navigation')
 
+            <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8" aria-live="polite">
+                @if (session('success') || session('status'))
+                    <div role="status" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                        {{ session('success') ?? session('status') }}
+                    </div>
+                @endif
+
+                @if (session('error') || $errors->any())
+                    <div role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        @if (session('error'))
+                            <p class="font-medium">{{ session('error') }}</p>
+                        @endif
+                        @if ($errors->any())
+                            <ul class="list-disc space-y-1 pl-5">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                @endif
+            </div>
+
             <!-- Page Heading -->
             @isset($header)
                 <header class="bg-white shadow">
