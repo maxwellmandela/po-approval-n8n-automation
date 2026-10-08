@@ -5,6 +5,8 @@ import test from 'node:test';
 const codeNode = await readFile(new URL('./approver-reply-classifier.js', import.meta.url), 'utf8');
 const replyWorkflow = JSON.parse(await readFile(new URL('./workflow.json', import.meta.url), 'utf8'));
 const workflowCodeNode = replyWorkflow.nodes.find((node) => node.name === 'Classify reply').parameters.jsCode;
+const combinedWorkflow = JSON.parse(await readFile(new URL('./combined-workflows.json', import.meta.url), 'utf8'));
+const notificationCodeNode = combinedWorkflow.nodes.find((node) => node.name === 'Build notification').parameters.jsCode;
 
 function runClassifier(code, reply) {
     const runCodeNode = new Function('$input', code);
@@ -14,6 +16,12 @@ function runClassifier(code, reply) {
 
 function classifyReply(reply) {
     return runClassifier(codeNode, reply);
+}
+
+function buildNotification(payload) {
+    const runCodeNode = new Function('$json', notificationCodeNode);
+
+    return runCodeNode({ body: payload })[0].json;
 }
 
 const baseReply = {
@@ -110,4 +118,24 @@ test('the imported workflow contains the tested classifier', () => {
     const reply = { ...baseReply, textPlain: 'Please clarify why this model is required.' };
 
     assert.deepEqual(runClassifier(workflowCodeNode, reply), classifyReply(reply));
+});
+
+test('resubmission email includes requester clarification and returns to approver', () => {
+    const response = 'The selected laptop is compatible with our approved development tools.';
+    const notification = buildNotification({
+        event: 'procurement.request.resubmitted',
+        request_number: 'PR-2026-0042',
+        item_description: 'Developer laptop',
+        quantity: 1,
+        amount: 125000,
+        department: 'IT',
+        requester: { email: 'requester@example.com' },
+        approver: { email: 'approver@example.com' },
+        reply_to: 'procurement@example.com',
+        clarification: { response },
+    });
+
+    assert.equal(notification.to, 'approver@example.com');
+    assert.equal(notification.replyTo, 'procurement@example.com');
+    assert.match(notification.message, new RegExp(response));
 });

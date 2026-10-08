@@ -1,58 +1,320 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Procurement Approval Workflow
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A procurement approval and business process automation system built with **Laravel and n8n**.
 
-## About Laravel
+The project demonstrates how a Laravel application can act as the **system of record** while n8n handles workflow orchestration and communication outside the application, including email-based approval decisions.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Demo
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+* **Live application:** https://po-approval-n8n-automation.onrender.com
+* **Video walkthrough:** https://youtu.be/loz2eEcSAR0
+* **Repository:** https://github.com/maxwellmandela/po-approval-n8n-automation
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Demo credentials
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+Email: johh.doey.123@gmail.com
+Password: password
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+> The credentials above are for the public demo environment only.
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Workflow Overview
 
-## Code of Conduct
+The workflow starts with a procurement request and determines whether it can be approved automatically or requires management approval.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```mermaid
+flowchart LR
+    A[Procurement Request] --> B[n8n Workflow]
+    B --> C[Laravel API]
+    C --> D{Business Rules}
 
-## Security Vulnerabilities
+    D -->|Within threshold| E[Auto Approve]
+    D -->|Requires authorization| F[Send Approval Email]
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    F --> G[Manager Approves / Rejects]
+    G --> H[n8n Processes Decision]
+    H --> I[Laravel Records Decision]
 
-## License
+    E --> I
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### How it works
+
+1. A procurement request enters the workflow.
+2. **n8n** detects and processes the request.
+3. n8n sends the relevant request data to the **Laravel API**.
+4. Laravel evaluates the request against configured business rules.
+5. Requests within the configured threshold can be **automatically approved**.
+6. Requests requiring authorization are routed to an approver by **email**.
+7. The approver approves or rejects the request through the email workflow.
+8. n8n receives and processes the decision.
+9. The decision is sent back to Laravel.
+10. Laravel records the final approval outcome.
+
+This allows operational processes to continue outside the application while keeping Laravel as the authoritative source for procurement and approval state.
+
+---
+
+## Example Approval Flows
+
+### Automatic Approval
+
+Requests that fall within the configured approval rules can move through the workflow without manual intervention.
+
+```text
+Procurement Request
+        ↓
+       n8n
+        ↓
+   Laravel API
+        ↓
+  Approval Rules
+        ↓
+   Auto-approved
+        ↓
+Decision recorded
+```
+
+### Manager Approval
+
+Requests requiring authorization are routed to an approver.
+
+```text
+Procurement Request
+        ↓
+       n8n
+        ↓
+   Laravel API
+        ↓
+ Requires Approval
+        ↓
+ Approval Email
+        ↓
+ Approve / Reject
+        ↓
+       n8n
+        ↓
+   Laravel API
+        ↓
+Decision recorded
+```
+
+---
+
+## Architecture
+
+The system separates application responsibilities from workflow automation.
+
+| Component       | Responsibility                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| **Laravel**     | Core application, business rules, authentication, procurement records and approval state |
+| **Laravel API** | Interface between the application and automation workflows                               |
+| **n8n**         | Workflow orchestration, routing, webhooks and external integrations                      |
+| **Email**       | Approval and rejection communication with approvers                                      |
+| **Database**    | Persistent procurement and approval state                                                |
+
+### Why Laravel + n8n?
+
+Laravel handles the **core business logic and system of record**, while n8n handles the **orchestration and integrations**.
+
+This separation makes it possible to change or extend external workflows without moving core procurement data and business rules into the automation platform.
+
+For example, the email approval step could later be replaced or supplemented with Slack, Microsoft Teams, SMS or another communication channel while Laravel continues to own the procurement state.
+
+---
+
+## Key Features
+
+* Procurement request management
+* Authentication and user roles
+* Approval threshold logic
+* Automatic approval for qualifying requests
+* Manager approval workflow
+* Email-based approval and rejection
+* Webhook communication between Laravel and n8n
+* REST API integration
+* Persistent approval decisions
+* Separation of business logic and workflow orchestration
+
+---
+
+## Technology Stack
+
+* **PHP**
+* **Laravel**
+* **n8n**
+* **MySQL**
+* **Blade**
+* **REST APIs**
+* **Webhooks**
+* **Email integration**
+
+---
+
+## Project Structure
+
+```text
+.
+├── app/                 # Laravel application code
+├── database/            # Migrations and database configuration
+├── resources/           # Blade views and frontend resources
+├── routes/              # Web and API routes
+├── n8n/                 # n8n workflow definitions
+├── public/              # Public Laravel assets
+├── tests/               # Application tests
+└── README.md
+```
+
+---
+
+## Running Locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/maxwellmandela/po-approval-n8n-automation.git
+
+cd po-approval-n8n-automation
+```
+
+### 2. Install PHP dependencies
+
+```bash
+composer install
+```
+
+### 3. Configure the environment
+
+```bash
+cp .env.example .env
+```
+
+Generate the application key:
+
+```bash
+php artisan key:generate
+```
+
+Configure the database and other environment variables in `.env`.
+
+### 4. Run migrations
+
+```bash
+php artisan migrate
+```
+
+### 5. Start Laravel
+
+```bash
+php artisan serve
+```
+
+The application will normally be available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+---
+
+## n8n Setup
+
+The `n8n/` directory contains the workflow definitions used by the project.
+
+To run the automation locally:
+
+1. Start an n8n instance.
+2. Import the workflow definitions from the `n8n/` directory.
+3. Configure the required credentials and integrations.
+4. Configure the Laravel application URL used by the n8n HTTP requests.
+5. Configure the webhook endpoints used to send approval decisions back to Laravel.
+6. Activate the relevant workflows.
+
+For local development, the Laravel API must be reachable from the n8n instance.
+
+---
+
+## API and Workflow Communication
+
+The Laravel application exposes endpoints used by the automation layer.
+
+The integration follows a simple pattern:
+
+```text
+n8n
+ ↓
+Laravel API
+ ↓
+Business Rules
+ ↓
+Procurement State
+```
+
+For approval decisions:
+
+```text
+Approver
+ ↓
+Email
+ ↓
+n8n
+ ↓
+Laravel API
+ ↓
+Approval Decision
+```
+
+This keeps the workflow layer responsible for orchestration while Laravel remains responsible for the application's persistent state.
+
+---
+
+## Design Considerations
+
+The implementation follows a few core principles:
+
+### Laravel remains the source of truth
+
+Procurement requests and approval decisions are persisted by the Laravel application rather than existing only inside an n8n execution.
+
+### Automation is separated from core business logic
+
+n8n handles workflow orchestration and external communication, while Laravel owns the underlying business rules and application state.
+
+### External communication happens through workflows
+
+The application can trigger operational processes without tightly coupling every external communication channel to the Laravel application.
+
+### Approval decisions are persisted
+
+An approval or rejection becomes part of the procurement record and can be used by the application for subsequent processing.
+
+---
+
+## Potential Extensions
+
+The workflow could be extended to support:
+
+* Multi-level approval chains
+* Department-specific approval thresholds
+* Vendor onboarding and verification
+* Purchase order generation after approval
+* Budget availability checks
+* Slack or Microsoft Teams notifications
+* Approval audit trails
+* Approval escalation and reminders
+* Role-based approval routing
+* Procurement reporting and analytics
+* Additional ERP or accounting integrations
+
+---
+
+## Project Purpose
+
+This project was built as a practical demonstration of **full-stack development, API integration and business process automation** using Laravel and n8n.
+
+Rather than building only a traditional CRUD application, the project explores how a Laravel application can integrate with an external automation platform to solve a realistic operational workflow.
+
+The architecture is intentionally small enough to demonstrate the concept while providing a foundation that could be expanded into a larger procurement management system.
